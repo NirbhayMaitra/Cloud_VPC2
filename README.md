@@ -53,7 +53,30 @@ A gateway is a node (router) in a computer network, a key stopping point for dat
 
 # Elastic IP
 
-
+<img src="images/eip.png">
 
 An Elastic IP address is a static, public IPv4 address designed for dynamic cloud computing. We can associate an Elastic IP address with any instance or network interface for any VPC in your account. With an Elastic IP address, we can mask the failure of an instance by rapidly remapping the address to another instance in your VPC. Note that the advantage of associating the Elastic IP address with the network interface instead of directly with the instance is that you can move all the attributes of the network interface from one instance to another in a single step.
 
+# NAT Gateway
+
+<img src="images/nat.jpg">
+
+We use a Network Address Translation (NAT) gateway to enable instances in a private subnet to connect to the internet or other AWS services, but prevent the internet from initiating a connection with those instances.
+NAT Gateway is a highly available AWS managed service that makes it easy to connect to the Internet from instances within a private subnet in an Amazon Virtual Private Cloud (Amazon VPC). Previously, you needed to launch a NAT instance to enable NAT for instances in a private subnet. 
+
+Lets start with our Task Number 4. The Objectives are:-
+1.  Write an Infrastructure as code using terraform, which automatically create a VPC.
+2.  In that VPC we have to create 2 subnets:
+    1.   public  subnet [ Accessible for Public World! ] 
+    2.   private subnet [ Restricted for Public World! ]
+3. Create a public facing internet gateway for connect our VPC/Network to the internet world and attach this gateway to our VPC.
+4. Create  a routing table for Internet gateway so that instance can connect to outside world, update and associate it with public subnet.
+5.  Create a NAT gateway for connect our VPC/Network to the internet world  and attach this gateway to our VPC in the public network
+6.  Update the routing table of the private subnet, so that to access the internet it uses the nat gateway created in the public subnet
+7.  Launch an ec2 instance which has Wordpress setup already having the security group allowing  port 80 so that our client can connect to our wordpress site. Also attach the key to instance for further login into it.
+8.  Launch an ec2 instance which has MYSQL setup already with security group allowing  port 3306 in private subnet so that our wordpress VM can connect with the same. Also attach the key with the same.
+
+Note: Wordpress instance has to be part of public subnet so that our client can connect our site. 
+mysql instance has to be part of private  subnet so that outside world can't connect to it.
+
+So Let's Start
