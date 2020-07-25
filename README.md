@@ -80,3 +80,231 @@ Note: Wordpress instance has to be part of public subnet so that our client can 
 mysql instance has to be part of private  subnet so that outside world can't connect to it.
 
 So Let's Start
+
+1. Choose the Provider whom Terraform will contact. In my case it is AWS
+>provider "aws" {
+>  region  = "ap-south-1"
+>  profile = "Zulu"
+>}
+
+
+2. Create IaaS code for terraform that will create a VPC for you. Now we have to create two subnets inside our VPC.
+
+resource "aws_vpc" "main" {
+  cidr_block       = "192.168.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "Nirbhay-VPC"
+  }
+}
+
+3. Create a public Subnet that will be accessible to the public World.
+
+resource "aws_subnet" "subnet1" {
+  vpc_id     = "${aws_vpc.main.id}"
+  cidr_block = "192.168.1.0/24"
+  map_public_ip_on_launch = true
+  availability_zone = "ap-south-1a"
+  tags = {
+    Name = "Nirbhay-Subnet_Public-1a"
+  }
+}
+
+4. Create a private Subnet that will be restricted for the access to the public world.
+
+resource "aws_subnet" "subnet2" {
+  vpc_id     = "${aws_vpc.main.id}"
+  cidr_block = "192.168.2.0/24"
+  availability_zone = "ap-south-1a"
+  tags = {
+    Name = "Nirbhay-Subnet_Private-1b"
+  }
+}
+
+
+5. Create an Internet Gateway for our VPC so that it can be connected to the outside World.
+
+resource "aws_internet_gateway" "gw" {
+  vpc_id = "${aws_vpc.main.id}"
+  tags = {
+    Name = "Nirbhay-Gateway"
+  }
+}
+
+6. Create a Route Table for our VPC so that our instances could connect to the outside world.
+
+resource "aws_route_table" "rt" {
+  vpc_id = "${aws_vpc.main.id}"
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.gw.id}"
+  }
+  tags = {
+    Name = "Nirbhay-pubic-rt"
+  }
+}
+
+7. Associate your Route Table with Public Subnet.
+
+resource "aws_route_table_association" "subnet_association" {
+  subnet_id      = aws_subnet.subnet1.id
+  route_table_id = aws_route_table.rt.id
+}
+
+8. After Route Table create one Elastic IP for NAT gateway inside VPC which gives one public static IP to the NAT Gateway.
+
+resource "aws_eip" "gateway_eip" {
+  vpc = true
+  depends_on = ["aws_internet_gateway.gw"]
+}
+
+9. Now Create a NAT gateway so that VPC is connected to the internet world. Also Attach this gateway to the VPC in the public network
+
+resource "aws_nat_gateway" "ngw" {
+  allocation_id = "${aws_eip.gateway_eip.id}"
+  subnet_id     = aws_subnet.subnet1.id
+  depends_on = ["aws_internet_gateway.gw"]
+} 
+
+10.Create a Route table for private subnet for the NAT Gateway to access the internet such that  it uses the nat gateway created in the public subnet
+
+resource "aws_route_table" "rt2" {
+  vpc_id = "${aws_vpc.main.id}"
+  route {
+    cidr_block = "0.0.0.0/0"
+    nat_gateway_id = "${aws_nat_gateway.ngw.id}"
+  }
+  tags = {
+    Name = "Nirbhay-nrt"
+  }
+}
+
+11. Associate the Routing table to the private subnet only.
+
+resource "aws_route_table_association" "subnet_association2" {
+  subnet_id      = aws_subnet.subnet2.id
+  route_table_id = aws_route_table.rt2.id
+}
+
+12.  Create a Security Group allowing Port 80 so that our client can connect to Wordpress and allowing port 22 so that our client can do SSH.
+
+resource "aws_security_group" "sg_webserver" {
+  name        = "Security_group_for_Wordpress"
+  description = "Allow ssh and httpd"
+  vpc_id      = "${aws_vpc.main.id}"
+  ingress {
+    description = "SSH Port"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+   ingress {
+    description = "HTTPD Port"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "Nirbhay_sg1"
+  }
+}
+
+13. Create a Security Group allowing Port 3306 so that our wordpress can connect to MySQL.
+
+resource "aws_security_group" "sg_database" {
+  name        = "for_MYSQL"
+  description = "Allow MySQL"
+  vpc_id      = "${aws_vpc.main.id}"
+  ingress {
+    description = "MySQL"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "Nirbhay_sg2"
+  }
+}
+
+14. Create a Key-Pair for our Instances or use already created key-pair. Here i created the Key with RSA Algorithm which Encrypt our data.
+
+resource "tls_private_key" "key-pair" {
+  algorithm = "RSA"
+  rsa_bits = 4096
+}
+
+resource "local_file" "private-key"{
+content = tls_private_key.key-pair.private_key_pem
+filename = "${var.ssh_key_name}.pem"
+file_permission = "0400"
+}
+
+resource "aws_key_pair" "deployer" {
+  key_name   = var.ssh_key_name
+  public_key = tls_private_key.key-pair.public_key_openssh
+}
+
+15. Launch an EC2 instance that has already wordpress in it and attach it with the security group having enabled port 80 so that our clients could connect it.
+
+resource "aws_instance" "web" {
+  ami           = "ami-000cbce3e1b899ebd"
+  instance_type = "t2.micro"
+  availability_zone = "ap-south-1a"
+  subnet_id      = "${aws_subnet.subnet1.id}"
+  associate_public_ip_address = true
+  key_name = "${var.ssh_key_name}"
+  vpc_security_group_ids = ["${aws_security_group.sg_webserver.id}"]
+
+  tags = {
+    Name = "NirbhayOS-wordpress"
+  }
+}
+
+16. Launch an EC2 instance that has already MySQL in it and attach it with the security group having enabled port 3306 so that our wordpress could connect to it.
+
+resource "aws_instance" "Mysql-OS" {
+  ami           = "ami-0019ac6129392a0f2"
+  availability_zone = "ap-south-1a"
+  instance_type = "t2.micro"
+  subnet_id      = "${aws_subnet.subnet2.id}"
+  key_name = "${var.ssh_key_name}"
+  vpc_security_group_ids = ["${aws_security_group.sg_database.id}"]
+
+  tags = {
+    Name = "NirbhayOS-mysql"
+  }
+}
+
+17. For testing purpose you can create null resource and checking the SSH and Public IPs and getting the Public IPs and configuring our Apache Server.
+
+resource "null_resource" "nullremote1" {
+  connection {
+    type = "ssh"
+    user = "bitnami"
+    host = aws_instance.web.public_ip
+    private_key = file("${var.ssh_key_name}.pem")
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo /opt/bitnami/ctlscript.sh restart apache",
+      "sudo /opt/bitnami/ctlscript.sh status",
+
+    ]
+  }
+}
