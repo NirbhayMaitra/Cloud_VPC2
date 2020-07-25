@@ -1,1 +1,1 @@
-# Cloud_VPC2
+## Creating a web portal for our company with all the security as much as possible using a Wordpress software with a dedicated database server in which Database is not accessible from the outside world for security purposes. Only the Wordpress is accessible to Clients. An additional feature has been added which is a NAT Gateway to provide the internet access to instances running in the private subnet.
