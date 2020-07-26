@@ -307,3 +307,98 @@ So Let's Start
 >    ]                                                                   <br>
 >  }                                                                     <br> 
 >}                                                                       <br>
+
+Now before running this file, I will show you that i have no instances running.
+
+<img src = "images/19.JPG">
+
+I have no Subnets and VPC created. 
+
+<img src = "images/20.JPG">
+
+Now let us run the terraform code by downloading the plugins using the Terraform init command and Running the code using Terraform apply command.
+If everything is correct, the terraform code will run successfully. After successful run you will notice that the VPC has now been created.
+
+<img src = "images/21.JPG">
+
+Public and Private subnets have been created.
+
+<img src = "images/22.JPG">
+
+Route Table has been created.
+
+<img src = "images/23.JPG">
+
+In edit route tables you will notice we have allowed all the traffics through our Internet Gateway.
+
+<img src = "images/24.JPG">
+
+We have associated our subnets with the route table.
+
+<img src = "images/25.JPG">
+
+We have attached our Gateway with the respective VPC
+
+<img src = "images/26.JPG">
+
+We have created one Elastic IP.
+
+<img src = "images/27.JPG">
+
+We have created a NAT Gateway too.
+
+<img src = "images/28.JPG">
+
+And launched two instances namely, OS and Wordpress.
+
+<img src = "images/29.JPG">
+
+Now for testing purpose, copy the IP of the wordpress for ssh.
+
+<img src = "images/30.JPG">
+
+login to the ssh. You will be now inside your wordpress OS. You can check your IP by using the ifocnfig command.
+
+<img src = "images/31.JPG">
+
+You can ping google now.
+
+<img src = "images/32.JPG">
+
+You can retrieve your current IP through which the data is transmitted by using the ipecho command mentioned below.
+
+<img src = "images/33.JPG">
+
+Now copy the ssh of MySQL.
+
+<img src = "images/34.JPG">
+
+Login to the ssh and ping google.
+
+<img src = "images/35.JPG">
+
+Now open the key.pem file which you have attached to your OS.
+
+<img src = "images/38.JPG">
+
+This is your key file with RSA Algorithm.
+
+<img src = "images/36.JPG">
+
+Paste the key in the file that will encrypt our data which will convert this key to the readable format only for those which have the access.
+
+<img src = "images/37.JPG">
+
+Now do ssh from the MySql to your wordpress. You will be able to go inside of it.
+
+<img src = "images/39.JPG">
+
+You will be able to ping google and retrieve the IP but none of the outsiders will be able to connect to your MySQL OS.
+
+<img src = "images/41.JPG">
+
+Now copy the Public IP of the OS and paste it on your web browser. You will notice our required target has been setup and the output has comeup.
+
+<img src = "images/48.JPG">
+
+So this finishes our required Task. If you have any queries regarding this , feel free to contact me or you can even mail me at:- nirbhaymaitra684@gmail.com
