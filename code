@@ -1,1 +1,197 @@
+provider "aws" {
+  region  = "ap-south-1"
+  profile = "Zulu"
+}
+
+resource "aws_vpc" "main" {
+  cidr_block       = "192.168.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "Nirbhay-VPC"
+  }
+}
+
+resource "aws_subnet" "subnet1" {
+  vpc_id     = "${aws_vpc.main.id}"
+  cidr_block = "192.168.1.0/24"
+  map_public_ip_on_launch = true
+  availability_zone = "ap-south-1a"
+  tags = {
+    Name = "Nirbhay-Subnet_Public-1a"
+  }
+}
+
+resource "aws_subnet" "subnet2" {
+  vpc_id     = "${aws_vpc.main.id}"
+  cidr_block = "192.168.2.0/24"
+  availability_zone = "ap-south-1a"
+  tags = {
+    Name = "Nirbhay-Subnet_Private-1b"
+  }
+}
+
+resource "aws_internet_gateway" "gw" {
+  vpc_id = "${aws_vpc.main.id}"
+  tags = {
+    Name = "Nirbhay-Gateway"
+  }
+}
+
+resource "aws_route_table" "rt" {
+  vpc_id = "${aws_vpc.main.id}"
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.gw.id}"
+  }
+  tags = {
+    Name = "Nirbhay-pubic-rt"
+  }
+}
+
+resource "aws_route_table_association" "subnet_association" {
+  subnet_id      = aws_subnet.subnet1.id
+  route_table_id = aws_route_table.rt.id
+}
+
+resource "aws_eip" "gateway_eip" {
+  vpc = true
+  depends_on = ["aws_internet_gateway.gw"]
+}
+
+resource "aws_nat_gateway" "ngw" {
+  allocation_id = "${aws_eip.gateway_eip.id}"
+  subnet_id     = aws_subnet.subnet1.id
+  depends_on = ["aws_internet_gateway.gw"]
+}
+
+resource "aws_route_table" "rt2" {
+  vpc_id = "${aws_vpc.main.id}"
+  route {
+    cidr_block = "0.0.0.0/0"
+    nat_gateway_id = "${aws_nat_gateway.ngw.id}"
+  }
+  tags = {
+    Name = "Nirbhay-nrt"
+  }
+}
+
+resource "aws_route_table_association" "subnet_association2" {
+  subnet_id      = aws_subnet.subnet2.id
+  route_table_id = aws_route_table.rt2.id
+}
+
+resource "aws_security_group" "sg_webserver" {
+  name        = "Security_group_for_Wordpress"
+  description = "Allow ssh and httpd"
+  vpc_id      = "${aws_vpc.main.id}"
+  ingress {
+    description = "SSH Port"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+   ingress {
+    description = "HTTPD Port"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "Nirbhay_sg1"
+  }
+}
+
+resource "aws_security_group" "sg_database" {
+  name        = "for_MYSQL"
+  description = "Allow MySQL"
+  vpc_id      = "${aws_vpc.main.id}"
+  ingress {
+    description = "MySQL"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "Nirbhay_sg2"
+  }
+}
+
+variable ssh_key_name {
+    default = "mykey5555"
+}
+
+resource "tls_private_key" "key-pair" {
+  algorithm = "RSA"
+  rsa_bits = 4096
+}
+
+resource "local_file" "private-key"{
+content = tls_private_key.key-pair.private_key_pem
+filename = "${var.ssh_key_name}.pem"
+file_permission = "0400"
+}
+
+resource "aws_key_pair" "deployer" {
+  key_name   = var.ssh_key_name
+  public_key = tls_private_key.key-pair.public_key_openssh
+}
+
+resource "aws_instance" "web" {
+  ami           = "ami-000cbce3e1b899ebd"
+  instance_type = "t2.micro"
+  availability_zone = "ap-south-1a"
+  subnet_id      = "${aws_subnet.subnet1.id}"
+  associate_public_ip_address = true
+  key_name = "${var.ssh_key_name}"
+  vpc_security_group_ids = ["${aws_security_group.sg_webserver.id}"]
+
+  tags = {
+    Name = "NirbhayOS-wordpress"
+  }
+}
+
+resource "aws_instance" "Mysql-OS" {
+  ami           = "ami-0019ac6129392a0f2"
+  availability_zone = "ap-south-1a"
+  instance_type = "t2.micro"
+  subnet_id      = "${aws_subnet.subnet2.id}"
+  key_name = "${var.ssh_key_name}"
+  vpc_security_group_ids = ["${aws_security_group.sg_database.id}"]
+
+  tags = {
+    Name = "NirbhayOS-mysql"
+  }
+}
+
+resource "null_resource" "nullremote1" {
+  connection {
+    type = "ssh"
+    user = "bitnami"
+    host = aws_instance.web.public_ip
+    private_key = file("${var.ssh_key_name}.pem")
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo /opt/bitnami/ctlscript.sh restart apache",
+      "sudo /opt/bitnami/ctlscript.sh status",
+
+    ]
+  }
+}
 
