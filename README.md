@@ -399,6 +399,6 @@ You will be able to ping google and retrieve the IP but none of the outsiders wi
 
 Now copy the Public IP of the OS and paste it on your web browser. You will notice our required target has been setup and the output has comeup.
 
-<img src = "images/48.JPG">
+<img src = "images/99.JPG">
 
 So this finishes our required Task. If you have any queries regarding this , feel free to contact me or you can even mail me at:- nirbhaymaitra684@gmail.com
